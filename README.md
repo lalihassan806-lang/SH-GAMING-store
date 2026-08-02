@@ -10,6 +10,7 @@ EasyPaisa checkout, and an admin panel for products & orders.
 - **Tailwind CSS** + custom `drip-*` classes (dark + fuchsia/purple)
 - **Supabase** (Postgres + Auth + RLS)
 - **Sonner** for toasts, **Lucide** for icons
+- Deployed on Vercel
 
 ## 1. Prerequisites
 

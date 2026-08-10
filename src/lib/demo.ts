@@ -20,6 +20,7 @@ export type DemoProduct = {
   price: number;
   old_price: number | null;
   gradient: string;
+  image_url?: string | null;
   active: boolean;
   featured: boolean;
   stock: number;

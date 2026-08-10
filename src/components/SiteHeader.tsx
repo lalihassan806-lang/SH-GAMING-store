@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Logo from "./Logo";
-import { IconArrow, IconCart } from "./Icons";
+import { IconArrow, IconKey } from "./Icons";
 import { getProfile } from "@/lib/auth";
 import { isDemo } from "@/lib/demo";
 
@@ -33,13 +33,18 @@ export default async function SiteHeader() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <Link
-            href="/cart"
-            aria-label="Cart"
-            className="relative grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-white/70 transition hover:border-white/25 hover:text-white"
-          >
-            <IconCart className="h-[18px] w-[18px]" />
-          </Link>
+          {/* This store has no cart — BuyPanel checks out a single item
+              directly. The icon links to the buyer's key vault instead. */}
+          {profile && (
+            <Link
+              href="/account"
+              aria-label="My key vault"
+              title="My key vault"
+              className="relative grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-white/70 transition hover:border-white/25 hover:text-white"
+            >
+              <IconKey className="h-[18px] w-[18px]" />
+            </Link>
+          )}
 
           {profile ? (
             <>

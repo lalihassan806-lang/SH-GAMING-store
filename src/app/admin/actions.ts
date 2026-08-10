@@ -42,6 +42,25 @@ const num = (v: FormDataEntryValue | null) => {
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 
+/**
+ * Accept only absolute http(s) image URLs.
+ * Rejecting other schemes matters: a `javascript:` or `data:` value stored here
+ * would be rendered straight into an img src on the public storefront.
+ */
+const imageUrl = (v: FormDataEntryValue | null): string | null => {
+  const raw = String(v ?? "").trim().slice(0, 500);
+  if (!raw) return null;
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    throw new Error("Image URL is not valid. Paste a full https:// link.");
+  }
+  if (u.protocol !== "https:" && u.protocol !== "http:")
+    throw new Error("Image URL must start with https://");
+  return u.toString();
+};
+
 /* ------------------------------ PRODUCTS ------------------------------ */
 
 export async function saveProduct(formData: FormData): Promise<Result> {
@@ -60,6 +79,7 @@ export async function saveProduct(formData: FormData): Promise<Result> {
       price: num(formData.get("price")),
       old_price: formData.get("old_price") ? num(formData.get("old_price")) : null,
       gradient: str(formData.get("gradient"), 20) || "orange",
+      image_url: imageUrl(formData.get("image_url")),
       active: formData.get("active") === "on",
       featured: formData.get("featured") === "on",
       sort: num(formData.get("sort")),

@@ -10,6 +10,7 @@ export type CardProduct = {
   price: number;
   old_price?: number | null;
   gradient?: string | null;
+  image_url?: string | null;
   stock?: number;
 };
 
@@ -23,7 +24,16 @@ export default function ProductCard({ p }: { p: CardProduct }) {
   return (
     <Link href={`/products/${p.slug}`} className="card card-hover group block overflow-hidden">
       {/* Cover */}
-      <div className={`relative aspect-[16/10] ${grad}`}>
+      <div className={`relative aspect-[16/10] overflow-hidden ${p.image_url ? "bg-ink-900" : grad}`}>
+        {p.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={p.image_url}
+            alt={p.name}
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
         <div className="absolute inset-0 opacity-25 [background-image:radial-gradient(circle_at_20%_20%,rgba(255,255,255,.55),transparent_45%)]" />
 

@@ -93,6 +93,23 @@ export default function ProductForm({ product }: { product?: any }) {
           />
         </div>
 
+        <div className="sm:col-span-2">
+          <label className="label" htmlFor="image_url">Cover image URL</label>
+          <input
+            id="image_url"
+            name="image_url"
+            type="url"
+            className="input"
+            defaultValue={p.image_url ?? ""}
+            placeholder="https://i.ibb.co/xxxx/cover.jpg (optional)"
+            maxLength={500}
+          />
+          <p className="mt-2 text-[11px] font-semibold text-white/35">
+            Leave blank to use the gradient cover below. Upload your image to
+            ImgBB / Imgur and paste the direct link here.
+          </p>
+        </div>
+
         <div>
           <label className="label" htmlFor="gradient">Cover colour</label>
           <select

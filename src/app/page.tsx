@@ -6,16 +6,26 @@ import ProductCard from "@/components/ProductCard";
 import WalletMock from "@/components/WalletMock";
 import { IconArrow, IconBolt, IconShield, IconWallet, IconChat, IconPlus } from "@/components/Icons";
 import { getProducts, getFaqs, getStoreStats, getPaymentMethods, compact } from "@/lib/data";
+import { getProfile } from "@/lib/auth";
+import { isDemo } from "@/lib/demo";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [products, faqs, stats, methods] = await Promise.all([
+  const [products, faqs, stats, methods, profile] = await Promise.all([
     getProducts(),
     getFaqs(),
     getStoreStats(),
     getPaymentMethods(),
+    isDemo ? Promise.resolve(null) : getProfile(),
   ]);
+
+  // Real product names in the hero card instead of hardcoded demo titles.
+  const vaultRows = products.slice(0, 3).map((p, i) => ({
+    n: p.name,
+    v: p.variants?.[0]?.label ?? "Instant",
+    g: `grad-${p.gradient || ["orange", "purple", "cyan"][i % 3]}`,
+  }));
 
   return (
     <>
@@ -80,7 +90,7 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <WalletMock />
+            <WalletMock balance={profile?.wallet ?? null} rows={vaultRows} />
           </div>
         </section>
 

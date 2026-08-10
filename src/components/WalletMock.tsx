@@ -1,7 +1,30 @@
 import { IconBolt, IconKey, IconWallet } from "./Icons";
+import { money } from "@/lib/auth";
 
-/** Decorative wallet/vault preview card shown beside the hero copy. */
-export default function WalletMock() {
+type Row = { n: string; v: string; g: string };
+
+/**
+ * Wallet/vault card beside the hero copy.
+ *
+ * `balance` is the signed-in user's real wallet, or null when nobody is signed
+ * in — in that case the strip shows a dash rather than a made-up figure, so a
+ * visitor is never shown a balance that looks like their own.
+ * `rows` are real product names when available.
+ */
+export default function WalletMock({
+  balance = null,
+  rows,
+}: {
+  balance?: number | null;
+  rows?: Row[];
+}) {
+  const items: Row[] =
+    rows && rows.length
+      ? rows.slice(0, 3)
+      : [
+          { n: "Your keys appear here", v: "Instant delivery", g: "grad-orange" },
+        ];
+
   return (
     <div className="relative animate-floaty">
       <div className="pointer-events-none absolute -inset-6 rounded-[2rem] bg-gold-500/12 blur-3xl" />
@@ -17,26 +40,22 @@ export default function WalletMock() {
                 Wallet Balance
               </div>
               <div className="mt-2 text-4xl font-extrabold tracking-tight">
-                Rs 2,480
+                {balance != null ? money(balance) : "Rs —"}
               </div>
             </div>
             <span className="rounded-full bg-black/15 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider">
-              Active
+              {balance != null ? "Active" : "Sign in"}
             </span>
           </div>
           <div className="relative mt-5 flex items-center justify-between text-[11px] font-bold">
-            <span className="opacity-70">•••• 4821</span>
+            <span className="opacity-70">Wallet</span>
             <span className="opacity-70">SH GAMING</span>
           </div>
         </div>
 
         {/* Vault rows */}
         <div className="mt-4 space-y-2.5">
-          {[
-            { n: "DRIP CLIENT", v: "30 Days", g: "grad-orange" },
-            { n: "HG CHEATS", v: "7 Days", g: "grad-purple" },
-            { n: "DRIP CLIENT PROXY", v: "30 Days", g: "grad-cyan" },
-          ].map((r) => (
+          {items.map((r) => (
             <div
               key={r.n}
               className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] p-3"

@@ -83,13 +83,25 @@ export async function getStoreStats() {
     .select("id", { count: "exact", head: true })
     .gte("created_at", since.toISOString());
 
+  // Revenue counts delivered orders only, so pending and cancelled orders
+  // never inflate the figure. Summed in JS because PostgREST has no SUM().
+  const { data: paid } = await supabase
+    .from("orders")
+    .select("total")
+    .eq("status", "delivered");
+
+  const revenue = (paid ?? []).reduce(
+    (sum: number, o: any) => sum + Number(o.total ?? 0),
+    0
+  );
+
   return {
     orders: orders.count ?? 0,
     products: products.count ?? 0,
     keysReady: keys.count ?? 0,
     members: members.count ?? 0,
     soldToday: soldToday ?? 0,
-    revenue: 0,
+    revenue,
   };
 }
 
@@ -106,6 +118,7 @@ function mapProduct(row: any): Product {
     price: Number(row.price ?? 0),
     old_price: row.old_price != null ? Number(row.old_price) : null,
     gradient: row.gradient ?? "orange",
+    image_url: row.image_url || null,
     active: !!row.active,
     featured: !!row.featured,
     stock: keys.filter((k: any) => k.status === "available").length,

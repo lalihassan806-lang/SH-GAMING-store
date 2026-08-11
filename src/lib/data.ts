@@ -119,6 +119,7 @@ function mapProduct(row: any): Product {
     old_price: row.old_price != null ? Number(row.old_price) : null,
     gradient: row.gradient ?? "orange",
     image_url: row.image_url || null,
+    fulfilment: row.fulfilment === "vault" ? "vault" : "supplier",
     active: !!row.active,
     featured: !!row.featured,
     stock: keys.filter((k: any) => k.status === "available").length,

@@ -138,7 +138,7 @@ export async function adminProducts() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("products")
-    .select("*, product_variants(id,label,price), license_keys(id,status)")
+    .select("*, product_variants(id,label,price,supplier_sku), license_keys(id,status)")
     .order("sort", { ascending: true });
 
   return (data ?? []).map((p: any) => ({
@@ -147,7 +147,12 @@ export async function adminProducts() {
     old_price: p.old_price != null ? Number(p.old_price) : null,
     stock: (p.license_keys ?? []).filter((k: any) => k.status === "available").length,
     variants: (p.product_variants ?? []).map((v: any) => ({
-      id: v.id, label: v.label, price: Number(v.price),
+      id: v.id,
+      label: v.label,
+      price: Number(v.price),
+      // The edit page shows this so the owner can see at a glance which
+      // durations can auto-deliver and which will fail at checkout.
+      supplier_sku: v.supplier_sku ?? null,
     })),
   }));
 }

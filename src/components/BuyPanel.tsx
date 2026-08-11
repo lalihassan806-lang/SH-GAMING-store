@@ -35,7 +35,10 @@ export default function BuyPanel({
   );
   const unit = variant?.price ?? product.price;
   const total = unit * qty;
-  const outOfStock = product.stock <= 0;
+  // Supplier-fulfilled items hold no local key inventory, so a zero stock
+  // count says nothing about availability — the supplier is asked at purchase
+  // time and the buyer is refunded if it cannot deliver.
+  const outOfStock = product.fulfilment === "vault" && product.stock <= 0;
   const notEnough = walletBalance != null && walletBalance < total;
 
   async function buy() {
@@ -63,9 +66,22 @@ export default function BuyPanel({
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Checkout failed");
 
-      router.push(`/account/orders/${json.order.id}?new=1`);
+      if (!res.ok) {
+        // The API refunds before replying, so say so explicitly — otherwise a
+        // failed order looks to the buyer like money that vanished.
+        const text = json.message || friendly(json.error);
+        setMsg({
+          type: "err",
+          text: json.refunded ? `${text} Your balance has been restored.` : text,
+        });
+        setBusy(false);
+        if (json.refunded) router.refresh(); // show the restored balance
+        return;
+      }
+
+      const id = json.order?.id ?? json.order_id;
+      router.push(`/account/orders/${id}?new=1`);
     } catch (e: any) {
       setMsg({ type: "err", text: friendly(e?.message) });
       setBusy(false);

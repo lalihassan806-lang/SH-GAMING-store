@@ -141,6 +141,27 @@ export default function ProductForm({ product }: { product?: any }) {
             defaultValue={p.sort ?? 0}
           />
         </div>
+
+        <div className="sm:col-span-2">
+          <label className="label" htmlFor="fulfilment">Delivery source</label>
+          <select
+            id="fulfilment"
+            name="fulfilment"
+            className="input"
+            defaultValue={p.fulfilment ?? "supplier"}
+          >
+            <option value="supplier" className="bg-ink-900">
+              Supplier — buy the key automatically at checkout
+            </option>
+            <option value="vault" className="bg-ink-900">
+              My key vault — deliver a key I uploaded myself
+            </option>
+          </select>
+          <p className="mt-2 text-[11px] font-semibold text-white/35">
+            Supplier products need a SKU on every duration option and are paid
+            for from your deposit. Vault products need keys uploaded in advance.
+          </p>
+        </div>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-5 border-t border-white/8 pt-5">

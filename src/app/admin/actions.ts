@@ -80,6 +80,9 @@ export async function saveProduct(formData: FormData): Promise<Result> {
       old_price: formData.get("old_price") ? num(formData.get("old_price")) : null,
       gradient: str(formData.get("gradient"), 20) || "orange",
       image_url: imageUrl(formData.get("image_url")),
+      // Whitelisted rather than passed through: the column has a CHECK
+      // constraint, and a bad value should not surface as a database error.
+      fulfilment: formData.get("fulfilment") === "vault" ? "vault" : "supplier",
       active: formData.get("active") === "on",
       featured: formData.get("featured") === "on",
       sort: num(formData.get("sort")),
@@ -141,6 +144,9 @@ export async function saveVariant(formData: FormData): Promise<Result> {
       label: str(formData.get("label"), 40),
       price: num(formData.get("price")),
       duration_days: formData.get("duration_days") ? num(formData.get("duration_days")) : null,
+      // Supplier SKU is per-duration: their catalogue is keyed like
+      // SANDBOX-DEMO-30D. A product-level code returns DURATION_REQUIRED.
+      supplier_sku: str(formData.get("supplier_sku"), 80) || null,
       sort: num(formData.get("sort")),
     };
     if (!row.label) throw new Error("Variant label is required.");
@@ -473,6 +479,37 @@ export async function saveSettings(formData: FormData): Promise<Result> {
     revalidatePath("/admin/settings");
     revalidatePath("/");
     return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/* ------------------------------ SUPPLIER ------------------------------ */
+
+/**
+ * Read-only view of the supplier catalogue and our deposit balance, so the
+ * admin can copy real SKUs into variants without leaving the panel.
+ *
+ * Deliberately does not write anything: auto-importing products would also
+ * import the supplier's prices, and the owner sets prices manually in PKR.
+ */
+export async function fetchSupplierCatalog(): Promise<
+  Result & { skus?: any[]; balanceUsd?: string }
+> {
+  try {
+    await assertAdmin();
+
+    const { listSkus, getBalance, supplierEnabled } = await import("@/lib/drip");
+    if (!supplierEnabled)
+      throw new Error("DRIP_API_KEY is not set in the environment.");
+
+    // One failing call should not hide the other, so report them separately.
+    const [skus, bal] = await Promise.all([
+      listSkus(),
+      getBalance().catch(() => ({ balanceUsd: "unavailable" })),
+    ]);
+
+    return { ok: true, skus, balanceUsd: (bal as any).balanceUsd };
   } catch (e) {
     return fail(e);
   }

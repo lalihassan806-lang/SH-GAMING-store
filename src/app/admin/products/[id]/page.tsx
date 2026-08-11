@@ -4,6 +4,7 @@ import PageHead from "@/components/admin/PageHead";
 import DemoBanner from "@/components/admin/DemoBanner";
 import ProductForm from "@/components/admin/ProductForm";
 import ActionForm from "@/components/admin/ActionForm";
+import SupplierCatalog from "@/components/admin/SupplierCatalog";
 import { IconTrash, IconPlus } from "@/components/Icons";
 import { adminProducts } from "@/lib/admin-data";
 import { money } from "@/lib/auth";
@@ -57,6 +58,15 @@ export default async function EditProductPage({
                   <div className="text-[11.5px] font-semibold text-white/40">
                     {money(v.price)}
                   </div>
+                  {v.supplier_sku ? (
+                    <div className="mt-0.5 font-mono text-[10.5px] text-emerald-300/70">
+                      {v.supplier_sku}
+                    </div>
+                  ) : (
+                    <div className="mt-0.5 text-[10.5px] font-bold text-amber-300/80">
+                      No SKU — cannot auto-deliver
+                    </div>
+                  )}
                 </div>
                 <ActionForm action={deleteVariant} confirm={`Remove "${v.label}"?`}>
                   <input type="hidden" name="id" value={v.id} />
@@ -109,23 +119,40 @@ export default async function EditProductPage({
                 Add
               </button>
             </div>
+            <div className="mt-3">
+              <input
+                name="supplier_sku"
+                className="input font-mono text-[12.5px]"
+                placeholder="Supplier SKU — e.g. SANDBOX-DEMO-30D"
+                maxLength={80}
+              />
+              <p className="mt-2 text-[11px] font-semibold text-white/35">
+                Required for instant delivery. Copy the exact SKU from the
+                supplier catalogue below — a product-level code will not work.
+              </p>
+            </div>
           </ActionForm>
         </div>
 
-        {/* Stock shortcut */}
-        <div className="card flex flex-wrap items-center justify-between gap-4 p-6">
-          <div>
-            <div className="text-[15px] font-bold text-white">
-              {product.stock} keys available
+        {!isDemo && <SupplierCatalog />}
+
+        {/* Stock shortcut. Supplier-fulfilled products hold no local keys, so
+            the vault count is meaningless for them and only invites confusion. */}
+        {product.fulfilment === "vault" && (
+          <div className="card flex flex-wrap items-center justify-between gap-4 p-6">
+            <div>
+              <div className="text-[15px] font-bold text-white">
+                {product.stock} keys available
+              </div>
+              <p className="mt-1 text-[12.5px] text-white/45">
+                Load more keys so buyers can check out.
+              </p>
             </div>
-            <p className="mt-1 text-[12.5px] text-white/45">
-              Load more keys so buyers can check out.
-            </p>
+            <Link href="/admin/keys" className="btn-gold btn-sm">
+              Manage key vault
+            </Link>
           </div>
-          <Link href="/admin/keys" className="btn-gold btn-sm">
-            Manage key vault
-          </Link>
-        </div>
+        )}
       </div>
     </>
   );

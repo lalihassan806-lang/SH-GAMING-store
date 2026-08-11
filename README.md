@@ -54,6 +54,10 @@ NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
+# Supplier API — server-only, spends your deposit. Never use NEXT_PUBLIC_.
+DRIP_API_KEY=drip_sk_live_xxxxxxxx
+DRIP_BASE_URL=https://dripclientofficial.dev
+
 NEXT_PUBLIC_STORE_NAME=SH GAMING STORE
 NEXT_PUBLIC_SUPPORT_URL=https://wa.me/920000000000
 ```
@@ -72,7 +76,36 @@ update public.profiles set role = 'admin' where email = 'you@example.com';
 
 Now `/admin` is unlocked for that account.
 
-### 5. Run
+If the role still reads `user` afterwards, the `guard_profile_columns` trigger
+reverted it — that trigger blocks non-admins from editing their own `role`, which
+is what stops a customer promoting themselves. Bypass it for one transaction:
+
+```sql
+begin;
+select set_config('app.bypass_profile_guard', 'on', true);
+update public.profiles set role = 'admin'
+  where email = 'you@example.com'
+  returning id, email, role;
+commit;
+```
+
+The `returning` clause matters: an `update` that matches no rows still reports
+success, which is the usual reason this appears to have worked when it has not.
+
+### 5. Connect the supplier
+
+Products are fulfilled by the supplier's API at purchase time. In **Admin →
+Products**, set **Delivery source** to *Supplier*, then paste the supplier SKU
+into each duration option — the **Supplier catalogue** panel on the product edit
+page lists every SKU with its cost and has a copy button.
+
+SKUs live on the duration option, not the product: the supplier's catalogue is
+keyed per duration, so a product-level code is rejected.
+
+Test with a `drip_sk_test_` key and the SKU `SANDBOX-DEMO-30D` before pointing a
+live key at real money.
+
+### 6. Run
 ```bash
 npm run dev     # http://localhost:3000
 ```
@@ -102,8 +135,11 @@ no code changes needed.
 ## Going live checklist
 
 - [ ] `supabase/schema.sql` executed
-- [ ] Env vars set locally and in Vercel
+- [ ] Env vars set locally and in Vercel (including `DRIP_API_KEY`)
 - [ ] Your account promoted to `admin`
+- [ ] A supplier SKU saved on every duration option you sell
+- [ ] One test purchase with a `drip_sk_test_` key before going live
+- [ ] Deposit topped up with the supplier — an empty deposit refunds buyers
 - [ ] Real payment account numbers entered in **Admin → Payments**
 - [ ] Support link set in **Admin → Settings**
 - [ ] Real products created and keys loaded in **Admin → Key Vault**
@@ -122,7 +158,7 @@ src/
     wallet/                  Top-up page
     account/                 Vault + orders/[id]
     login/ signup/ logout/   Auth
-    api/checkout/            Wallet checkout endpoint
+    api/checkout/            Reserve → supplier call → settle/refund
     api/topup/               Top-up request endpoint
     admin/
       layout.tsx             Role guard + sidebar shell
@@ -136,6 +172,37 @@ src/
     data.ts                  Storefront queries (demo-aware)
     admin-data.ts            Admin queries (demo-aware)
     demo.ts                  Sample dataset + isDemo flag
+    drip.ts                  Supplier API client (server-only)
   proxy.ts                   Refreshes the Supabase session cookie
-supabase/schema.sql          Tables, RLS, triggers, checkout function
+supabase/schema.sql          Everything, in one runnable file
+supabase/parts/              The same schema split 01..06 for readability
 ```
+
+---
+
+## How a purchase works
+
+The HTTP call to the supplier cannot happen inside a database transaction: a
+hung supplier would hold a row lock on the buyer's wallet. So checkout is three
+short transactions with the network call between them.
+
+1. **`reserve_order`** — debits the wallet and creates the order as `paid`.
+   The buyer is charged *before* the supplier is called, which is what makes
+   double-spend impossible.
+2. **`POST /api/v1/orders`** — buys the key, using our own order id as the
+   `Idempotency-Key` so a network retry returns the original order instead of
+   charging the deposit twice.
+3. **`settle_order`** — attaches the key and marks the order `delivered`.
+   On any failure in step 2, **`refund_order`** returns the money and cancels
+   the order, and the wallet ledger shows both movements.
+
+`refund_order` refuses to refund an order that is already `delivered`, so a
+buyer cannot keep the key and get the money back. Conversely, if step 3 fails
+after the key was bought, the order is left `paid` for manual review and the key
+is still shown to the buyer — they paid for it.
+
+Two wallets are in play and should not be confused: the customer's **PKR** wallet
+lives in `profiles.wallet`, while your **USD** deposit lives with the supplier.
+Retail prices are set by hand in PKR; there is no exchange-rate conversion in the
+code. Supplier costs are USD *microcents* (1 USD = 100,000,000) and are stored
+raw — never divide them by 100.

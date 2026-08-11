@@ -21,6 +21,7 @@ export type DemoProduct = {
   old_price: number | null;
   gradient: string;
   image_url?: string | null;
+  fulfilment?: "supplier" | "vault";
   active: boolean;
   featured: boolean;
   stock: number;

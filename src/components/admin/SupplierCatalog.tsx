@@ -4,6 +4,19 @@ import { useState, useTransition } from "react";
 import { IconBox, IconCheck } from "@/components/Icons";
 import { fetchSupplierCatalog } from "@/app/admin/actions";
 
+/**
+ * The supplier adds a 1% developer fee server-side, so the catalogue's listed
+ * price is not what the deposit actually pays. Duplicated from lib/drip.ts
+ * rather than imported: that module reads DRIP_API_KEY and must never be
+ * pulled into a client bundle.
+ */
+const DEVELOPER_FEE_PERCENT = 1;
+
+function costWithFeeUsd(priceUsd: string | number): string {
+  const p = Number(priceUsd) || 0;
+  return (p * (1 + DEVELOPER_FEE_PERCENT / 100)).toFixed(2);
+}
+
 type Sku = {
   apiCode: string;
   name: string;
@@ -75,7 +88,8 @@ export default function SupplierCatalog() {
             Supplier catalogue
           </h2>
           <p className="mt-1 text-[12.5px] text-white/45">
-            Copy a SKU from here into the duration option above.
+            Copy a SKU from here into the duration option above. Costs shown
+            include the supplier&apos;s {DEVELOPER_FEE_PERCENT}% fee.
           </p>
         </div>
 
@@ -129,7 +143,7 @@ export default function SupplierCatalog() {
                   {s.apiCode}
                 </div>
                 <div className="mt-0.5 text-[11px] font-semibold text-white/40">
-                  ${s.priceUsd} cost
+                  ${costWithFeeUsd(s.priceUsd)} cost
                   {s.inStock ? (
                     <span className="text-emerald-300/70"> · {s.stock} in stock</span>
                   ) : (

@@ -12,8 +12,21 @@
 
 export const MICROCENTS_PER_USD = 100_000_000;
 
+/**
+ * The API adds a 1% developer fee on every purchase, charged server-side. The
+ * catalogue's priceUsd is BEFORE that fee, so the real cost of a key is ~1%
+ * higher than the listed price. Margins must be worked out against this.
+ */
+export const DEVELOPER_FEE_PERCENT = 1;
+
 export function microcentsToUsd(mc: number | null | undefined): number {
   return Number(mc ?? 0) / MICROCENTS_PER_USD;
+}
+
+/** Listed price plus the 1% fee — what the deposit is actually charged. */
+export function costWithFeeUsd(priceUsd: string | number): string {
+  const p = Number(priceUsd) || 0;
+  return (p * (1 + DEVELOPER_FEE_PERCENT / 100)).toFixed(2);
 }
 
 const BASE_URL = process.env.DRIP_BASE_URL || "https://dripclientofficial.dev";

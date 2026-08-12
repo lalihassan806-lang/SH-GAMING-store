@@ -2,12 +2,14 @@ import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SupportFab from "@/components/SupportFab";
 import TopupForm from "@/components/TopupForm";
+import AutoTopup from "@/components/AutoTopup";
 import StatusBadge from "@/components/StatusBadge";
 import { IconWallet } from "@/components/Icons";
 import { getPaymentMethods } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, money } from "@/lib/auth";
 import { isDemo } from "@/lib/demo";
+import { gatewayEnabled } from "@/lib/binance-pay";
 
 export const dynamic = "force-dynamic";
 
@@ -36,8 +38,9 @@ export default async function WalletPage() {
           <span className="pill">Wallet</span>
           <h1 className="section-title mt-4">Top up your balance</h1>
           <p className="mt-2 max-w-xl text-sm text-white/50">
-            Send the amount to any account below, then submit the transaction
-            reference. Our team approves top-ups fast.
+            {gatewayEnabled
+              ? "Pay with Binance Pay for an instant credit, or send to any account below and submit the reference for manual approval."
+              : "Send the amount to any account below, then submit the transaction reference. Our team approves top-ups fast."}
           </p>
 
           <div className="mt-9 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
@@ -78,7 +81,16 @@ export default async function WalletPage() {
             </div>
 
             {/* Form + history */}
-            <div>
+            <div className="space-y-6">
+              {/* Instant path first: it needs no admin and no waiting, so it is
+                  the one most buyers should reach for. Renders nothing at all
+                  when the gateway has no credentials. */}
+              <AutoTopup
+                enabled={gatewayEnabled || isDemo}
+                demo={isDemo}
+                loggedIn={!!profile}
+              />
+
               <TopupForm
                 methods={methods.map((m: any) => m.name)}
                 demo={isDemo}
@@ -86,8 +98,8 @@ export default async function WalletPage() {
               />
 
               {topups.length > 0 && (
-                <>
-                  <h2 className="mt-9 text-lg font-bold text-white">
+                <div>
+                  <h2 className="text-lg font-bold text-white">
                     Your top-up requests
                   </h2>
                   <div className="card mt-4 divide-y divide-white/8">
@@ -105,7 +117,7 @@ export default async function WalletPage() {
                       </div>
                     ))}
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>

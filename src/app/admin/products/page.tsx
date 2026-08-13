@@ -2,6 +2,7 @@ import Link from "next/link";
 import PageHead from "@/components/admin/PageHead";
 import DemoBanner from "@/components/admin/DemoBanner";
 import ActionForm from "@/components/admin/ActionForm";
+import SupplierImport from "@/components/admin/SupplierImport";
 import StatusBadge from "@/components/StatusBadge";
 import { IconPlus, IconTrash, IconKey } from "@/components/Icons";
 import { adminProducts } from "@/lib/admin-data";
@@ -29,6 +30,10 @@ export default async function AdminProductsPage() {
 
       <div className="space-y-5 p-5 sm:p-8">
         {isDemo && <DemoBanner />}
+
+        {/* Nothing reaches the storefront until it exists in OUR products table,
+            so this panel is the entry point for a brand-new store. */}
+        {!isDemo && <SupplierImport />}
 
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[860px]">
@@ -131,9 +136,9 @@ export default async function AdminProductsPage() {
               {products.length === 0 && (
                 <tr>
                   <td className="td py-12 text-center text-white/45" colSpan={6}>
-                    No products yet.{" "}
+                    No products yet — import them from your supplier above, or{" "}
                     <Link href="/admin/products/new" className="font-bold text-gold-400">
-                      Add your first one
+                      add one by hand
                     </Link>
                   </td>
                 </tr>

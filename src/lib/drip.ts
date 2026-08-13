@@ -46,7 +46,67 @@ export type DripSku = {
   priceUsd: string;
   stock: number;
   inStock: boolean;
+  /** Marketing copy and artwork, used when importing a product. */
+  description: string | null;
+  imageUrl: string | null;
 };
+
+/** One supplier product with its duration SKUs, ready to import. */
+export type DripProduct = {
+  productApiCode: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  skus: DripSku[];
+};
+
+/**
+ * The catalogue is a flat list of duration SKUs, but our schema is a product
+ * with variants underneath it. This groups the former into the latter.
+ */
+export function groupSkus(skus: DripSku[]): DripProduct[] {
+  const byProduct = new Map<string, DripProduct>();
+
+  for (const s of skus) {
+    const code = s.productApiCode || s.product;
+    if (!code) continue;
+
+    let p = byProduct.get(code);
+    if (!p) {
+      p = {
+        productApiCode: code,
+        name: s.product || s.name,
+        category: s.category,
+        // Taken from the first SKU: the supplier repeats the same product-level
+        // copy and artwork on every duration.
+        description: s.description,
+        imageUrl: s.imageUrl,
+        skus: [],
+      };
+      byProduct.set(code, p);
+    }
+    p.skus.push(s);
+    if (!p.description && s.description) p.description = s.description;
+    if (!p.imageUrl && s.imageUrl) p.imageUrl = s.imageUrl;
+  }
+
+  // Cheapest duration first, so the imported variants read 1 day → 30 days
+  // rather than in whatever order the supplier happened to return them.
+  for (const p of byProduct.values()) {
+    p.skus.sort((a, b) => a.price - b.price);
+  }
+
+  return [...byProduct.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Supplier image paths are relative; make them absolute for our <img>. */
+export function absoluteImageUrl(u: string | null | undefined): string | null {
+  const raw = String(u ?? "").trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `${BASE_URL}${raw.startsWith("/") ? "" : "/"}${raw}`;
+}
 
 export type DripOrder = {
   id: string;

@@ -514,3 +514,225 @@ export async function fetchSupplierCatalog(): Promise<
     return fail(e);
   }
 }
+
+/**
+ * The supplier's catalogue grouped into importable products.
+ *
+ * Reports which ones are already in our database so the picker can say so
+ * instead of letting the owner import the same product twice.
+ */
+export async function fetchSupplierProducts(): Promise<
+  Result & { products?: any[] }
+> {
+  try {
+    const { supabase } = await assertAdmin();
+
+    const { listSkus, groupSkus, absoluteImageUrl, supplierEnabled } = await import(
+      "@/lib/drip"
+    );
+    if (!supplierEnabled)
+      throw new Error("DRIP_API_KEY is not set in the environment.");
+
+    const grouped = groupSkus(await listSkus());
+
+    const { data: existing } = await supabase
+      .from("products")
+      .select("slug,name");
+    const taken = new Set((existing ?? []).map((p: any) => p.slug));
+
+    return {
+      ok: true,
+      products: grouped.map((p) => ({
+        productApiCode: p.productApiCode,
+        name: p.name,
+        category: p.category,
+        imageUrl: absoluteImageUrl(p.imageUrl),
+        slug: slugify(p.name),
+        imported: taken.has(slugify(p.name)),
+        skus: p.skus.map((s) => ({
+          apiCode: s.apiCode,
+          label: s.label || s.name,
+          priceUsd: s.priceUsd,
+          days: s.days,
+          inStock: s.inStock,
+        })),
+      })),
+    };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Create one of our products from a supplier product, with a variant per
+ * duration and the supplier SKU already filled in on each.
+ *
+ * Retail prices are NOT imported. The supplier quotes USD and the store sells
+ * in PKR at the owner's own margin, so an imported price would be wrong in both
+ * currency and amount. Every variant starts at 0 and must be priced by hand —
+ * which is also why the product is created inactive.
+ */
+export async function importSupplierProduct(formData: FormData): Promise<Result> {
+  try {
+    const { supabase } = await assertAdmin();
+
+    const code = str(formData.get("product_api_code"), 120);
+    if (!code) throw new Error("Pick a supplier product first.");
+
+    const { listSkus, groupSkus, absoluteImageUrl, supplierEnabled } = await import(
+      "@/lib/drip"
+    );
+    if (!supplierEnabled)
+      throw new Error("DRIP_API_KEY is not set in the environment.");
+
+    // Re-read from the supplier rather than trusting the form: the browser
+    // could otherwise submit any SKU string it liked, and a wrong SKU only
+    // fails later at checkout, in front of a paying customer.
+    const product = groupSkus(await listSkus()).find(
+      (p) => p.productApiCode === code
+    );
+    if (!product) throw new Error("That product is no longer in the supplier catalogue.");
+
+    const slug = slugify(product.name);
+
+    const { data: dupe } = await supabase
+      .from("products")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (dupe) throw new Error(`"${product.name}" is already imported.`);
+
+    const { data: created, error: pErr } = await supabase
+      .from("products")
+      .insert({
+        name: product.name,
+        slug,
+        tag: product.category || "",
+        description: (product.description || "").slice(0, 2000),
+        // Zero, deliberately: an unpriced product must not be buyable.
+        price: 0,
+        image_url: absoluteImageUrl(product.imageUrl),
+        fulfilment: "supplier",
+        // Hidden until priced. Publishing a Rs 0 listing would sell keys at a
+        // total loss the moment it went live.
+        active: false,
+      })
+      .select()
+      .single();
+    if (pErr) throw new Error(pErr.message);
+
+    const variants = product.skus.map((s, i) => ({
+      product_id: created.id,
+      label: (s.label || s.name).slice(0, 40),
+      price: 0,
+      duration_days: s.days,
+      supplier_sku: s.apiCode,
+      sort: i + 1,
+    }));
+
+    if (variants.length) {
+      const { error: vErr } = await supabase.from("product_variants").insert(variants);
+      // The product exists but has no durations, which is not sellable. Rolled
+      // back so a retry is a clean import rather than a duplicate-name error.
+      if (vErr) {
+        await supabase.from("products").delete().eq("id", created.id);
+        throw new Error(vErr.message);
+      }
+    }
+
+    revalidatePath("/admin/products");
+    revalidatePath("/products");
+    revalidatePath("/");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Import every supplier product that is not already in the database.
+ *
+ * Same rules as the single import: no prices, and everything hidden until the
+ * owner sets them.
+ */
+export async function importAllSupplierProducts(): Promise<
+  Result & { added?: number; skipped?: number }
+> {
+  try {
+    const { supabase } = await assertAdmin();
+
+    const { listSkus, groupSkus, absoluteImageUrl, supplierEnabled } = await import(
+      "@/lib/drip"
+    );
+    if (!supplierEnabled)
+      throw new Error("DRIP_API_KEY is not set in the environment.");
+
+    const grouped = groupSkus(await listSkus());
+
+    const { data: existing } = await supabase.from("products").select("slug");
+    const taken = new Set((existing ?? []).map((p: any) => p.slug));
+
+    let added = 0;
+    let skipped = 0;
+
+    for (const product of grouped) {
+      const slug = slugify(product.name);
+      if (taken.has(slug)) {
+        skipped++;
+        continue;
+      }
+
+      const { data: created, error: pErr } = await supabase
+        .from("products")
+        .insert({
+          name: product.name,
+          slug,
+          tag: product.category || "",
+          description: (product.description || "").slice(0, 2000),
+          price: 0,
+          image_url: absoluteImageUrl(product.imageUrl),
+          fulfilment: "supplier",
+          active: false,
+          sort: added + 1,
+        })
+        .select()
+        .single();
+
+      // One bad product should not abandon the rest of the import.
+      if (pErr || !created) {
+        skipped++;
+        continue;
+      }
+
+      taken.add(slug);
+
+      const variants = product.skus.map((s, i) => ({
+        product_id: created.id,
+        label: (s.label || s.name).slice(0, 40),
+        price: 0,
+        duration_days: s.days,
+        supplier_sku: s.apiCode,
+        sort: i + 1,
+      }));
+
+      if (variants.length) {
+        const { error: vErr } = await supabase.from("product_variants").insert(variants);
+        if (vErr) {
+          await supabase.from("products").delete().eq("id", created.id);
+          taken.delete(slug);
+          skipped++;
+          continue;
+        }
+      }
+
+      added++;
+    }
+
+    revalidatePath("/admin/products");
+    revalidatePath("/products");
+    revalidatePath("/");
+    return { ok: true, added, skipped };
+  } catch (e) {
+    return fail(e);
+  }
+}

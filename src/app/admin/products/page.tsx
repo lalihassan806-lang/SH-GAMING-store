@@ -8,6 +8,7 @@ import { IconPlus, IconTrash, IconKey } from "@/components/Icons";
 import { adminProducts } from "@/lib/admin-data";
 import { money } from "@/lib/auth";
 import { isDemo } from "@/lib/demo";
+import { supplierEnabled } from "@/lib/drip";
 import { deleteProduct, toggleProduct } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +33,10 @@ export default async function AdminProductsPage() {
         {isDemo && <DemoBanner />}
 
         {/* Nothing reaches the storefront until it exists in OUR products table,
-            so this panel is the entry point for a brand-new store. */}
-        {!isDemo && <SupplierImport />}
+            so this panel is the entry point for a brand-new store. Rendered
+            unconditionally: hiding it when the supplier is unconfigured only
+            made the page look broken with no way to tell why. */}
+        <SupplierImport supplierEnabled={supplierEnabled} isDemo={isDemo} />
 
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[860px]">

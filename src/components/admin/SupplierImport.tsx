@@ -48,7 +48,14 @@ type SupplierProduct = {
   skus: Sku[];
 };
 
-export default function SupplierImport() {
+export default function SupplierImport({
+  supplierEnabled = true,
+  isDemo = false,
+}: {
+  /** False when DRIP_API_KEY is missing on the server. */
+  supplierEnabled?: boolean;
+  isDemo?: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [products, setProducts] = useState<SupplierProduct[] | null>(null);
@@ -111,6 +118,10 @@ export default function SupplierImport() {
     setBusy(null);
   }
 
+  // Nothing can be loaded without a server-side key, so say so instead of
+  // offering a button that always fails.
+  const blocked = isDemo || !supplierEnabled;
+
   const needle = q.trim().toLowerCase();
   const shown = (products ?? []).filter(
     (p) =>
@@ -136,7 +147,12 @@ export default function SupplierImport() {
         </div>
 
         <div className="flex items-center gap-3">
-          {products && remaining > 0 && (
+          {blocked && (
+            <span className="badge shrink-0 border border-amber-500/25 bg-amber-500/12 text-amber-300">
+              {isDemo ? "Demo mode" : "API key missing"}
+            </span>
+          )}
+          {!blocked && products && remaining > 0 && (
             <button
               type="button"
               onClick={importAll}
@@ -149,13 +165,21 @@ export default function SupplierImport() {
           <button
             type="button"
             onClick={load}
-            disabled={pending || !!busy}
-            className="btn-ghost btn-sm whitespace-nowrap"
+            disabled={pending || !!busy || blocked}
+            className="btn-ghost btn-sm whitespace-nowrap disabled:opacity-40"
           >
             {pending ? "Loading…" : products ? "Refresh" : "Load supplier products"}
           </button>
         </div>
       </div>
+
+      {blocked && (
+        <div className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-[12.5px] font-medium text-amber-200">
+          {isDemo
+            ? "Demo mode is on because Supabase is not configured. Importing needs a real database."
+            : "DRIP_API_KEY is not set on the server. Add it in your hosting project's environment variables (all environments), redeploy, then reload this page."}
+        </div>
+      )}
 
       {error && (
         <div
